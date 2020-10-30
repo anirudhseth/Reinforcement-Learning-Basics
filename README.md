@@ -1,2 +1,2 @@
-# Reinforcement-Learni-Basics
+# Reinforcement-Learnig-Basics
 Implimentation of basic RL algorithms in PyTorch
