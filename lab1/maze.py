@@ -236,16 +236,18 @@ class Maze:
             # Add the starting position in the maze to the path
             path.append(start);
             # Move to next state given the policy and the current state
-            next_s = self.__move(s,policy[s]);
+            possible_states = self.__move(s,policy[s]);
+            next_s = np.random.choice(possible_states)
             # Add the position in the maze corresponding to the next state
             # to the path
             path.append(self.states[next_s]);
             # Loop while state is not the goal state
-            while s != next_s:
+            while self.states[s][0] != self.states[next_s][0]:
                 # Update state
                 s = next_s;
                 # Move to next state given the policy and the current state
-                next_s = self.__move(s,policy[s]);
+                possible_states = self.__move(s,policy[s]);
+                next_s = np.random.choice(possible_states)
                 # Add the position in the maze corresponding to the next state
                 # to the path
                 path.append(self.states[next_s])
