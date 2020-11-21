@@ -3,8 +3,6 @@ import matplotlib.pyplot as plt
 import time
 from IPython import display
 
-# Implemented methods
-methods = ['DynProg', 'ValIter'];
 
 # Some colours
 LIGHT_RED    = '#FFC4CC';
@@ -34,23 +32,24 @@ class Maze:
     }
 
     # Reward values
-    STEP_REWARD = -1
-    GOAL_REWARD = 1
-    IMPOSSIBLE_REWARD = -20
+    BANK_REWARD = 10
+    CAUGHT_REWARD = -50
+    
 
 
-    def __init__(self, maze,minotaurStay=False):
-        """ Constructor of the environment Maze.
+    def __init__(self, maze, weights=None, random_rewards=False):
+        """ Constructor of the environment maze.
         """
-        self.minotaurStay             = minotaurStay
+       
         self.maze                     = maze;
         self.actions                  = self.__actions();
         self.states, self.map         = self.__states();
         self.n_actions                = len(self.actions);
         self.n_states                 = len(self.states);
         self.transition_probabilities = self.__transitions();
-        self.rewards                  = self.__rewards();
-    
+        self.rewards                  = self.__rewards(weights=weights,
+                                                random_rewards=random_rewards);
+        
 
     def __actions(self):
         actions = dict();
@@ -69,12 +68,11 @@ class Maze:
 
         for player_i in range(self.maze.shape[0]):
             for player_j in range(self.maze.shape[1]):
-                if self.maze[player_i,player_j] != 1:
-                            for minotaur_i in range(self.maze.shape[0]):
-                                for minotaur_j in range(self.maze.shape[1]):
-                                    minotaur_pos=(minotaur_i,minotaur_j)
+                            for police_i in range(self.maze.shape[0]):
+                                for police_j in range(self.maze.shape[1]):
+                                    police_pos=(police_i,police_j)
                                     player_pos=(player_i,player_j)
-                                    temp = (player_pos,minotaur_pos);
+                                    temp = (player_pos,police_pos);
                                     states[s] = temp
                                     map[temp] = s;
                                     s += 1;
@@ -105,10 +103,7 @@ class Maze:
             player_pos_temp=(row,col)
             # print(player_pos_temp)
             # minotaur_pos_temp=(self.states[state][1][0],self.states[state][1][1])
-        if(self.minotaurStay==True):
-            minotaur_actions = {4: (0, 0), 0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}
-        else:
-            minotaur_actions = {0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}
+        minotaur_actions = {4: (0, 0), 0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}
         #stay condition
         possibleNextStates = []
         minotaur_row = self.states[state][1][0]
@@ -143,43 +138,59 @@ class Maze:
         # are deterministic.
         for s in range(self.n_states):
             for a in range(self.n_actions):
-                possible_player_states = self.__move(s,a);
+                next_s = self.__move(s,a);
+                # print(next_s)
+                prob = 1.0 / len(next_s)
 
-                prob = 1.0 / len(possible_player_states)
-
-                for next_state in possible_player_states:
-                    transition_probabilities[next_state, s, a] = prob
-       
+                for ns in next_s:
+                    transition_probabilities[ns, s, a] = prob
+                # transition_probabilities[next_s, s, a] = 1;
         return transition_probabilities;
 
-    def __rewards(self):
+    def __rewards(self, weights=None, random_rewards=None):
 
         rewards = np.zeros((self.n_states, self.n_actions));
 
- 
-        for s in range(self.n_states):
-            for a in range(self.n_actions):
+        # If the rewards are not described by a weight matrix
+        if weights is None:
+            for s in range(self.n_states):
+                for a in range(self.n_actions):
 
-                possible_player_states = self.__move(s,a);
-                
-                state_reward = 0.0
-                for next_state in possible_player_states:
+                    next_state = self.__move(s,a);
                     
-                    # Rewrd for hitting a wall
-                    if self.states[s][0] == self.states[next_state][0] and a != self.STAY:
-                        # print('her1')
-                        state_reward += self.IMPOSSIBLE_REWARD;
-                    if self.states[next_state][0]==self.states[next_state][1]:
-                        state_reward += self.IMPOSSIBLE_REWARD;
-                    # Reward for reaching the exit
-                    elif self.states[s][0] == self.states[next_state][0] and self.maze[self.states[next_state][0]] == 2:
-                        state_reward += self.GOAL_REWARD;
-                    # Reward for taking a step to an empty cell that is not the exit
-                    else:
-                        state_reward += self.STEP_REWARD;
-                rewards[s,a] = state_reward / len(possible_player_states)
-
-
+                    state_reward = 0.0
+                    for next_s in next_state:
+                        
+                        # Rewrd for hitting a wall
+                        if self.states[s][0] == self.states[next_s][0] and a != self.STAY:
+                            # print('her1')
+                            state_reward += self.IMPOSSIBLE_REWARD;
+                        if self.states[next_s][0]==self.states[next_s][1]:
+                            state_reward += self.IMPOSSIBLE_REWARD;
+                        # Reward for reaching the exit
+                        elif self.states[s][0] == self.states[next_s][0] and self.maze[self.states[next_s][0]] == 2:
+                            state_reward += self.GOAL_REWARD;
+                        # Reward for taking a step to an empty cell that is not the exit
+                        else:
+                            state_reward += self.STEP_REWARD;
+                    rewards[s,a] = state_reward / len(next_state)
+                    # If there exists trapped cells with probability 0.5
+                    if random_rewards and self.maze[self.states[next_s][0]]<0:
+                        row, col = self.states[next_s][0];
+                        # With probability 0.5 the reward is
+                        r1 = (1 + abs(self.maze[row, col])) * rewards[s,a];
+                        # With probability 0.5 the reward is
+                        r2 = rewards[s,a];
+                        # The average reward
+                        rewards[s,a] = 0.5*r1 + 0.5*r2;
+        # If the weights are descrobed by a weight matrix
+        else:
+            for s in range(self.n_states):
+                 for a in range(self.n_actions):
+                     next_s = self.__move(s,a);
+                     i,j = self.states[next_s][0];
+                     # Simply put the reward as the weights o the next state.
+                     rewards[s,a] = weights[i][j];
 
         return rewards;
 
@@ -189,53 +200,7 @@ class Maze:
             raise NameError(error);
 
         path = list();
-        if method == 'DynProg':
-            # Deduce the horizon from the policy shape
-            horizon = policy.shape[1];
-            # Initialize current state and time
-            t = 0;
-            s = self.map[start];
-            # Add the starting position in the maze to the path
-            path.append(start);
-            while t < horizon-1:
-                # Move to next state given the policy and the current state
-                possible_states = self.__move(s,policy[s,t]);
-                # for p in possible_states:
-                #     print(self.states[p])
-                next_s = np.random.choice(possible_states)
-                # print(next_s)
-                # Add the position in the maze corresponding to the next state
-                # to the path
-                path.append(self.states[next_s])
-                if(self.states[next_s][0]==(6,5) or self.states[next_s][0]==self.states[next_s][1]):
-                    return path
-                # Update time and state for next iteration
-                t +=1;
-                s = next_s;
-        if method == 'ValIter':
-            # Initialize current state, next state and time
-            t = 1;
-            s = self.map[start];
-            # Add the starting position in the maze to the path
-            path.append(start);
-            # Move to next state given the policy and the current state
-            possible_states = self.__move(s,policy[s]);
-            next_s = np.random.choice(possible_states)
-            # Add the position in the maze corresponding to the next state
-            # to the path
-            path.append(self.states[next_s]);
-            # Loop while state is not the goal state
-            while self.states[s][0] != self.states[next_s][0]:
-                # Update state
-                s = next_s;
-                # Move to next state given the policy and the current state
-                possible_states = self.__move(s,policy[s]);
-                next_s = np.random.choice(possible_states)
-                # Add the position in the maze corresponding to the next state
-                # to the path
-                path.append(self.states[next_s])
-                # Update time and state for next iteration
-                t +=1;
+
         return path
 
     def show(self):
@@ -249,108 +214,6 @@ class Maze:
         print(self.rewards)
 
 
-def dynamic_programming(env, horizon):
-    """ Solves the shortest path problem using dynamic programming
-        :input Maze env           : The maze environment in which we seek to
-                                    find the shortest path.
-        :input int horizon        : The time T up to which we solve the problem.
-        :return numpy.array V     : Optimal values for every state at every
-                                    time, dimension S*T
-        :return numpy.array policy: Optimal time-varying policy at every state,
-                                    dimension S*T
-    """
-
-    # The dynamic prgramming requires the knowledge of :
-    # - Transition probabilities
-    # - Rewards
-    # - State space
-    # - Action space
-    # - The finite horizon
-    p         = env.transition_probabilities;
-    r         = env.rewards;
-    n_states  = env.n_states;
-    n_actions = env.n_actions;
-    T         = horizon;
-
-    # The variables involved in the dynamic programming backwards recursions
-    V      = np.zeros((n_states, T+1));
-    policy = np.zeros((n_states, T+1));
-    Q      = np.zeros((n_states, n_actions));
-
-
-    # Initialization
-    Q            = np.copy(r);
-    V[:, T]      = np.max(Q,1);
-    policy[:, T] = np.argmax(Q,1);
-
-    # The dynamic programming bakwards recursion
-    for t in range(T-1,-1,-1):
-        # Update the value function acccording to the bellman equation
-        for s in range(n_states):
-            for a in range(n_actions):
-                # Update of the temporary Q values
-                Q[s,a] = r[s,a] + np.dot(p[:,s,a],V[:,t+1])
-        # Update by taking the maximum Q value w.r.t the action a
-        V[:,t] = np.max(Q,1);
-        # The optimal action is the one that maximizes the Q function
-        policy[:,t] = np.argmax(Q,1);
-    return V, policy;
-
-def value_iteration(env, gamma, epsilon):
-    """ Solves the shortest path problem using value iteration
-        :input Maze env           : The maze environment in which we seek to
-                                    find the shortest path.
-        :input float gamma        : The discount factor.
-        :input float epsilon      : accuracy of the value iteration procedure.
-        :return numpy.array V     : Optimal values for every state at every
-                                    time, dimension S*T
-        :return numpy.array policy: Optimal time-varying policy at every state,
-                                    dimension S*T
-    """
-    # The value itearation algorithm requires the knowledge of :
-    # - Transition probabilities
-    # - Rewards
-    # - State space
-    # - Action space
-    # - The finite horizon
-    p         = env.transition_probabilities;
-    r         = env.rewards;
-    n_states  = env.n_states;
-    n_actions = env.n_actions;
-
-    # Required variables and temporary ones for the VI to run
-    V   = np.zeros(n_states);
-    Q   = np.zeros((n_states, n_actions));
-    BV  = np.zeros(n_states);
-    # Iteration counter
-    n   = 0;
-    # Tolerance error
-    tol = (1 - gamma)* epsilon/gamma;
-
-    # Initialization of the VI
-    for s in range(n_states):
-        for a in range(n_actions):
-            Q[s, a] = r[s, a] + gamma*np.dot(p[:,s,a],V);
-    BV = np.max(Q, 1);
-
-    # Iterate until convergence
-    while np.linalg.norm(V - BV) >= tol and n < 200:
-        # Increment by one the numbers of iteration
-        n += 1;
-        # Update the value function
-        V = np.copy(BV);
-        # Compute the new BV
-        for s in range(n_states):
-            for a in range(n_actions):
-                Q[s, a] = r[s, a] + gamma*np.dot(p[:,s,a],V);
-        BV = np.max(Q, 1);
-        # Show error
-        #print(np.linalg.norm(V - BV))
-
-    # Compute policy
-    policy = np.argmax(Q,1);
-    # Return the obtained policy
-    return V, policy;
 
 def draw_maze(maze):
 
@@ -366,7 +229,7 @@ def draw_maze(maze):
 
     # Remove the axis ticks and add title title
     ax = plt.gca();
-    ax.set_title('The Maze');
+    ax.set_title('maze Heist');
     ax.set_xticks([]);
     ax.set_yticks([]);
 
