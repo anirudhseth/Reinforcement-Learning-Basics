@@ -35,9 +35,9 @@ class Maze:
 
     # Reward values
     STEP_REWARD = -1
-    GOAL_REWARD = 1
-    IMPOSSIBLE_REWARD = -20
-
+    GOAL_REWARD = 10
+    IMPOSSIBLE_REWARD = -100
+    POLICE_REWARD = -50
 
     def __init__(self, maze,minotaurStay=False):
         """ Constructor of the environment Maze.
@@ -69,18 +69,36 @@ class Maze:
 
         for player_i in range(self.maze.shape[0]):
             for player_j in range(self.maze.shape[1]):
-                if self.maze[player_i,player_j] != 1:
-                            for minotaur_i in range(self.maze.shape[0]):
-                                for minotaur_j in range(self.maze.shape[1]):
-                                    minotaur_pos=(minotaur_i,minotaur_j)
-                                    player_pos=(player_i,player_j)
-                                    temp = (player_pos,minotaur_pos);
-                                    states[s] = temp
-                                    map[temp] = s;
-                                    s += 1;
+                for minotaur_i in range(self.maze.shape[0]):
+                    for minotaur_j in range(self.maze.shape[1]):
+                        minotaur_pos=(minotaur_i,minotaur_j)
+                        player_pos=(player_i,player_j)
+                        temp = (player_pos,minotaur_pos);
+                        states[s] = temp
+                        map[temp] = s;
+                        s += 1;
         return states, map
 
-
+    def getPoliceActions(self,state):
+        police_actions={}
+        playerx=self.states[state][0][0]
+        playery=self.states[state][0][1]
+        policex=self.states[state][1][0]
+        policey=self.states[state][1][1]
+        i=0
+        if not int(np.sign(playerx - policex))==-1:
+            police_actions[i]= (1,0)
+            i=i+1
+        if not int(np.sign(playerx - policex))==1:
+            police_actions[i]= (-1,0)
+            i=i+1
+        if not int(np.sign(playery - policey))==-1:
+            police_actions[i]= (0,1)
+            i=i+1
+        if not int(np.sign(playery - policey))==1:
+            police_actions[i]= (0,-1)
+            i=i+1   
+        return police_actions
     def __move(self, state, action):
         """ Makes a step in the maze, given a current position and an action.
             If the action STAY or an inadmissible action is used, the agent stays in place.
@@ -94,8 +112,7 @@ class Maze:
         col = player_col + self.actions[action][1];
         # Is the future position an impossible one ?
         hitting_maze_walls =  (row == -1) or (row == self.maze.shape[0]) or \
-                              (col == -1) or (col == self.maze.shape[1]) or \
-                              (self.maze[row,col] == 1);
+                              (col == -1) or (col == self.maze.shape[1])
         # Based on the impossiblity check return the next state.
         # minotaur_pos_temp = self.minotaurMove(state)
         if hitting_maze_walls:
@@ -105,10 +122,9 @@ class Maze:
             player_pos_temp=(row,col)
             # print(player_pos_temp)
             # minotaur_pos_temp=(self.states[state][1][0],self.states[state][1][1])
-        if(self.minotaurStay==True):
-            minotaur_actions = {4: (0, 0), 0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}
-        else:
-            minotaur_actions = {0: (0, -1), 1: (0, 1), 2: (-1, 0), 3: (1, 0)}
+  
+        minotaur_actions = self.getPoliceActions(state)
+        # print(minotaur_actions)
         #stay condition
         possibleNextStates = []
         minotaur_row = self.states[state][1][0]
@@ -170,9 +186,9 @@ class Maze:
                         # print('her1')
                         state_reward += self.IMPOSSIBLE_REWARD;
                     if self.states[next_state][0]==self.states[next_state][1]:
-                        state_reward += self.IMPOSSIBLE_REWARD;
+                        state_reward += self.POLICE_REWARD;
                     # Reward for reaching the exit
-                    elif self.states[s][0] == self.states[next_state][0] and self.maze[self.states[next_state][0]] == 2:
+                    elif self.maze[self.states[next_state][0]] == 2:
                         state_reward += self.GOAL_REWARD;
                     # Reward for taking a step to an empty cell that is not the exit
                     else:
@@ -225,7 +241,7 @@ class Maze:
             # to the path
             path.append(self.states[next_s]);
             # Loop while state is not the goal state
-            while self.states[s][0] != self.states[next_s][0]:
+            while self.states[next_s][0]!=(6,5):
                 # Update state
                 s = next_s;
                 # Move to next state given the policy and the current state
@@ -332,9 +348,10 @@ def value_iteration(env, gamma, epsilon):
         for a in range(n_actions):
             Q[s, a] = r[s, a] + gamma*np.dot(p[:,s,a],V);
     BV = np.max(Q, 1);
-
+    V_plot=[]
     # Iterate until convergence
     while np.linalg.norm(V - BV) >= tol and n < 200:
+    # while n < 1000:
         # Increment by one the numbers of iteration
         n += 1;
         # Update the value function
@@ -345,12 +362,13 @@ def value_iteration(env, gamma, epsilon):
                 Q[s, a] = r[s, a] + gamma*np.dot(p[:,s,a],V);
         BV = np.max(Q, 1);
         # Show error
+        V_plot.append(V[8])
         #print(np.linalg.norm(V - BV))
 
     # Compute policy
     policy = np.argmax(Q,1);
     # Return the obtained policy
-    return V, policy;
+    return V, policy,V_plot;
 
 def draw_maze(maze):
 
