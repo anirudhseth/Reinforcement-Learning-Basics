@@ -31,12 +31,12 @@ def running_average(x, N):
     return y
 
 # Load model
-try:
-    model = torch.load('neural-network-1.pth')
-    print('Network model: {}'.format(model))
-except:
-    print('File neural-network-1.pth not found!')
-    exit(-1)
+# try:
+model = torch.load('neural-network-1.pth' ,map_location= torch.device('cpu'))
+print('Network model: {}'.format(model))
+# except:
+    # print('File neural-network-1.pth not found!')
+    # exit(-1)
 
 # Import and initialize Mountain Car Environment
 env = gym.make('LunarLander-v2')
