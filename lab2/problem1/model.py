@@ -4,9 +4,8 @@ import torch.nn.functional as F
 
 class Neural_Network(nn.Module):
 
-    def __init__(self, input_dim, output_dim, seed):
+    def __init__(self, input_dim, output_dim):
         super(Neural_Network, self).__init__()  
-        self.seed = torch.manual_seed(seed)
         self.fc1 = nn.Linear(input_dim, 128)
         self.fc2 = nn.Linear(128,64)
         self.out = nn.Linear(64, output_dim)
@@ -16,3 +15,4 @@ class Neural_Network(nn.Module):
         x = F.relu(self.fc2(x))
         out = self.out(x)
         return out  
+    
