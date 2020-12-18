@@ -59,6 +59,7 @@ for i in EPISODES:
     state = env.reset()
     total_episode_reward = 0.
     t = 0
+    
     while not done:
         # Take a random action
         action = agent.forward(state)
