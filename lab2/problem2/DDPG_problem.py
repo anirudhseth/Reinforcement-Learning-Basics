@@ -1,26 +1,24 @@
-# Copyright [2020] [KTH Royal Institute of Technology] Licensed under the
-# Educational Community License, Version 2.0 (the "License"); you may
-# not use this file except in compliance with the License. You may
-# obtain a copy of the License at http://www.osedu.org/licenses/ECL-2.0
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an "AS IS"
-# BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express
-# or implied. See the License for the specific language governing
-# permissions and limitations under the License.
-#
-# Course: EL2805 - Reinforcement Learning - Lab 2 Problem 2
-# Code author: [Alessio Russo - alessior@kth.se]
-# Last update: 20th November 2020, by alessior@kth.se
-#
-
-# Load packages
-import numpy as np
-import gym
 import torch
-import matplotlib.pyplot as plt
+import gym
+import numpy as np
+from DDPG_agent import Agent,ReplayBuffer
 from tqdm import trange
-from DDPG_agent import RandomAgent
+import matplotlib.pyplot as plt
 
+def fill_replay_buffer(env,replay_buffer, observation_steps):
+    time_steps = 0
+    state = env.reset()
+    done = False
+    while time_steps < observation_steps:
+        action = env.action_space.sample()
+        next_state, reward, done, _ = env.step(action)
+        replay_buffer.add((state, next_state, action, reward, done))
+        state = next_state
+        time_steps += 1
+        if done:
+            state = env.reset()
+            done = False
+        print("\rFilling buffer: {}/{}.".format(time_steps, observation_steps), end="")
 
 def running_average(x, N):
     ''' Function used to compute the running average
@@ -33,69 +31,55 @@ def running_average(x, N):
         y = np.zeros_like(x)
     return y
 
-# Import and initialize Mountain Car Environment
-env = gym.make('LunarLanderContinuous-v2')
-env.reset()
+SEED = 0
+REPLAY_SIZE = 30000
+n_ep_running_average = 50
+n_episodes=100
+max_steps=1000
 
-# Parameters
-N_episodes = 100               # Number of episodes to run for training
-discount_factor = 0.95         # Value of gamma
-n_ep_running_average = 50      # Running average of 50 episodes
-m = len(env.action_space.high) # dimensionality of the action
+env = gym.make("LunarLanderContinuous-v2")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+env.seed(SEED)
+torch.manual_seed(SEED)
+np.random.seed(SEED)
+state_dim = env.observation_space.shape[0]
+action_dim = env.action_space.shape[0] 
+max_action = float(env.action_space.high[0])
+policy = Agent(state_dim, action_dim, max_action, env,BATCH_SIZE=64, GAMMA=0.99, TAU=1e-3, NOISE=0.2, NOISE_CLIP=0.5, POLICY_FREQUENCY=2)
+replay_buffer = ReplayBuffer()
 
-# Reward
-episode_reward_list = []  # Used to save episodes reward
-episode_number_of_steps = []
+fill_replay_buffer(env, replay_buffer, REPLAY_SIZE)
 
-# Agent initialization
-agent = RandomAgent(m)
-
-# Training process
-EPISODES = trange(N_episodes, desc='Episode: ', leave=True)
+episode_reward_list = []       # this list contains the total reward per episode
+episode_number_of_steps = []   # this list contains the number of steps per episode
+EPISODES = trange(n_episodes, desc='Episode: ', leave=True)
 
 for i in EPISODES:
-    # Reset enviroment data
-    done = False
     state = env.reset()
     total_episode_reward = 0.
-    t = 0
-    
-    while not done:
-        # Take a random action
-        action = agent.forward(state)
-
-        # Get next state and reward.  The done variable
-        # will be True if you reached the goal position,
-        # False otherwise
+    t=0
+    for k in range(max_steps):
+        action = policy.act(np.array(state), noise=0.1)
+        #env.render()
         next_state, reward, done, _ = env.step(action)
-
-        # Update episode reward
+        done_bool =  float(done)
+        # Store data in replay buffer
+        replay_buffer.add((state, next_state, action, reward, done_bool))
         total_episode_reward += reward
-
-        # Update state for next iteration
+        policy.train(replay_buffer,t)
         state = next_state
-        t+= 1
-
-    # Append episode reward
+        t+=1
+        if done:
+            break 
     episode_reward_list.append(total_episode_reward)
     episode_number_of_steps.append(t)
-    # Close environment
-    env.close()
+    EPISODES.set_description("Episode {} - Reward/Steps: {:.1f}/{} - Avg. Reward/Steps: {:.1f}/{}".format(i, total_episode_reward, t,
+    running_average(episode_reward_list, n_ep_running_average)[-1],
+    running_average(episode_number_of_steps, n_ep_running_average)[-1]))
 
-    # Updates the tqdm update bar with fresh information
-    # (episode number, total reward of the last episode, total number of Steps
-    # of the last episode, average reward, average number of steps)
-    EPISODES.set_description(
-        "Episode {} - Reward/Steps: {:.1f}/{} - Avg. Reward/Steps: {:.1f}/{}".format(
-        i, total_episode_reward, t,
-        running_average(episode_reward_list, n_ep_running_average)[-1],
-        running_average(episode_number_of_steps, n_ep_running_average)[-1]))
-
-
-# Plot Rewards and steps
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(16, 9))
-ax[0].plot([i for i in range(1, N_episodes+1)], episode_reward_list, label='Episode reward')
-ax[0].plot([i for i in range(1, N_episodes+1)], running_average(
+ax[0].plot([i for i in range(1, n_episodes+1)], episode_reward_list, label='Episode reward')
+ax[0].plot([i for i in range(1, n_episodes+1)], running_average(
     episode_reward_list, n_ep_running_average), label='Avg. episode reward')
 ax[0].set_xlabel('Episodes')
 ax[0].set_ylabel('Total reward')
@@ -103,8 +87,8 @@ ax[0].set_title('Total Reward vs Episodes')
 ax[0].legend()
 ax[0].grid(alpha=0.3)
 
-ax[1].plot([i for i in range(1, N_episodes+1)], episode_number_of_steps, label='Steps per episode')
-ax[1].plot([i for i in range(1, N_episodes+1)], running_average(
+ax[1].plot([i for i in range(1, n_episodes+1)], episode_number_of_steps, label='Steps per episode')
+ax[1].plot([i for i in range(1, n_episodes+1)], running_average(
     episode_number_of_steps, n_ep_running_average), label='Avg. number of steps per episode')
 ax[1].set_xlabel('Episodes')
 ax[1].set_ylabel('Total number of steps')

@@ -54,14 +54,8 @@ def main():
         running_average(episode_reward_list, n_ep_running_average)[-1],
         running_average(episode_number_of_steps, n_ep_running_average)[-1]))
 
-    print('Saving results for plot.')
-    Results ={}
-    Results['steps'] = episode_number_of_steps
-    Results['rewards'] = episode_reward_list
-    np.save('Plot_data.npy',Results)
 
-    print('Saving torch model.')
-    torch.save(agent.QNet.to('cpu'),'neural-network-1.pth')
+
 
 if __name__ == "__main__":
     main()
