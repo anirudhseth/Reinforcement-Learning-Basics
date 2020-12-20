@@ -34,45 +34,40 @@ class Agent():
     
     def train(self, replay_buffer,it):
       
-       
-
           # Sample replay buffer 
-          x, y, u, r, d = replay_buffer.sample(self.BATCH_SIZE)
-          state = torch.FloatTensor(x).to(self.device)
-          action = torch.FloatTensor(u).to(self.device)
-          next_state = torch.FloatTensor(y).to(self.device)
+          st, nst, ac, r, d = replay_buffer.sample(self.BATCH_SIZE)
+          state = torch.FloatTensor(st).to(self.device)
+          action = torch.FloatTensor(ac).to(self.device)
+          next_state = torch.FloatTensor(nst).to(self.device)
           done = torch.FloatTensor(1 - d).to(self.device)
           reward = torch.FloatTensor(r).to(self.device)
-          # state,action,reward,next_state,done = replay_buffer.sample()
-          # Select action according to policy and add clipped noise 
-          noise = torch.FloatTensor(u).data.normal_(0, self.NOISE).to(self.device)
-          # noise = action.data.normal_(0, policy_noise).to(self.device)
+
+          noise = torch.FloatTensor(ac).data.normal_(0, self.NOISE).to(self.device)
+       
           noise = noise.clamp(-self.NOISE_CLIP, self.NOISE_CLIP)
           next_action = (self.actor_target(next_state) + noise).clamp(-self.max_action, self.max_action)
 
-          # Compute the target Q value
+          # Compute the target Q 
           target_Q= self.critic_target(next_state, next_action)
     
           target_Q = reward + (done * self.GAMMA * target_Q).detach()
 
-          # Get current Q estimates
+          # Get current Q 
           current_Q = self.critic(state, action)
 
-          # Compute critic loss
+          # Compute  loss
           critic_loss = F.mse_loss(current_Q, target_Q) 
 
-          # Optimize the critic
           self.critic_optimizer.zero_grad()
           critic_loss.backward()
           self.critic_optimizer.step()
 
-          # Delayed policy updates
+          # Delayed  updates
           if it % self.POLICY_FREQUENCY == 0:
 
-              # Compute actor loss
+              #  actor loss
               actor_loss = -self.critic(state, self.actor(state)).mean()
 
-              # Optimize the actor 
               self.actor_optimizer.zero_grad()
               actor_loss.backward()
               self.actor_optimizer.step()
