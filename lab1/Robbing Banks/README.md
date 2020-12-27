@@ -11,5 +11,5 @@ right and left with probability 1/3. When the police and you are not on the same
 same column, say the police is below you and on your right, then the police moves up and left with
 probability 1/2.
 The rewards are discounted at rate <img src="https://render.githubusercontent.com/render/math?math=\lambda \in(0,1)"> , and your objective is to maximise your average
-discounted reward.
+discounted reward.<br>
 ![stack Overflow](refs/figure2.PNG)
