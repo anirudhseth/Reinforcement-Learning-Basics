@@ -53,3 +53,33 @@ conda create --name <env> --file requirements.txt
    
   </tr>
  </table>
+
+ ## Deep Q-Networks (DQN) - LunarLander discrete
+
+ <table>
+  <tr>
+    <td>Episodic reward and steps</td>
+     <td>Effect of discount factor</td>
+   
+  </tr>
+  <tr>
+    <td><img src="Deep Q-Networks (DQN) - LunarLander discrete/Results/Reward_final_network.png"></img></td>
+    <td><img src="Deep Q-Networks (DQN) - LunarLander discrete/Results/DiscountVsReward.png"></img></td>
+   
+  </tr>
+ </table>
+
+  ## Deep Deterministic Policy Gradient (DDPG) - LunarLander Continous
+
+ <table>
+  <tr>
+    <td>Episodic reward and steps</td>
+     <td>Effect of discount factor</td>
+   
+  </tr>
+  <tr>
+    <td><img src="Deep Deterministic Policy Gradient (DDPG) - LunarLander Continous/Results/Reward_final_network.png"></img></td>
+    <td><img src="Deep Deterministic Policy Gradient (DDPG) - LunarLander Continous/Results/Prob2_discount_factor.png"></img></td>
+   
+  </tr>
+ </table>
